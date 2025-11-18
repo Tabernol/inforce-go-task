@@ -1,0 +1,13 @@
+# Go build/cache
+**/vendor
+**/.git
+**/.idea
+**/.vscode
+**/node_modules
+*.log
+*.tmp
+bin
+out
+
+# Local files
+.env
