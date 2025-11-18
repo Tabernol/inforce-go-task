@@ -3,51 +3,174 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"github.com/Tabernol/inforce-go-task/pkg/rarible"
 	"net/http"
+	"regexp"
+	"time"
 )
 
+//type RaribleHandler struct {
+//	client rarible.Client
+//}
+//
+//func NewRaribleHandler(client rarible.Client) *RaribleHandler {
+//	return &RaribleHandler{client: client}
+//}
+//
+//func (h *RaribleHandler) GetOwnership(w http.ResponseWriter, r *http.Request) {
+//	fmt.Print("try to GET info by ownershipId")
+//	tokenID := r.URL.Query().Get("ownershipId")
+//	if tokenID == "" {
+//		http.Error(w, "ownershipId required", http.StatusBadRequest)
+//		return
+//	}
+//
+//	data, err := h.client.GetOwnershipByID(context.Background(), tokenID)
+//	if err != nil {
+//		http.Error(w, err.Error(), http.StatusInternalServerError)
+//		return
+//	}
+//
+//	w.Header().Set("Content-Type", "application/json")
+//	json.NewEncoder(w).Encode(data)
+//}
+//
+//func (h *RaribleHandler) GetTraitRarity(w http.ResponseWriter, r *http.Request) {
+//	// парсим body JSON
+//	var req rarible.TraitRarityRequest
+//	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+//		http.Error(w, err.Error(), http.StatusBadRequest)
+//		return
+//	}
+//
+//	data, err := h.client.QueryTraitsWithRarity(context.Background(), req)
+//	if err != nil {
+//		http.Error(w, err.Error(), http.StatusInternalServerError)
+//		return
+//	}
+//
+//	w.Header().Set("Content-Type", "application/json")
+//	json.NewEncoder(w).Encode(data)
+//}
+
+type errorResponse struct {
+	Error   string `json:"error"`
+	Details string `json:"details,omitempty"`
+}
+
 type RaribleHandler struct {
-	client rarible.Client
+	client    rarible.Client
+	timeout   time.Duration
+	ethRegexp *regexp.Regexp
 }
 
 func NewRaribleHandler(client rarible.Client) *RaribleHandler {
-	return &RaribleHandler{client: client}
+	return &RaribleHandler{
+		client:    client,
+		timeout:   10 * time.Second, // timeout for third-party API
+		ethRegexp: regexp.MustCompile(`^ETHEREUM:.+:.+:.+$`),
+	}
 }
 
+// GetOwnership handles GET /ownership?ownershipId=...
 func (h *RaribleHandler) GetOwnership(w http.ResponseWriter, r *http.Request) {
-	fmt.Print("try to GET info by ownershipId")
-	tokenID := r.URL.Query().Get("ownershipId")
-	if tokenID == "" {
-		http.Error(w, "ownershipId required", http.StatusBadRequest)
-		return
-	}
-
-	data, err := h.client.GetOwnershipByID(context.Background(), tokenID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
+
+	ownershipID := r.URL.Query().Get("ownershipId")
+	if ownershipID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse{
+			Error:   "ownershipId required",
+			Details: "Query param ownershipId is missing",
+		})
+		return
+	}
+
+	if !h.ethRegexp.MatchString(ownershipID) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse{
+			Error:   "invalid ownershipId",
+			Details: "ownershipId must match format ETHEREUM:contract:tokenId:owner",
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), h.timeout)
+	defer cancel()
+
+	data, err := h.client.GetOwnershipByID(ctx, ownershipID)
+	if err != nil {
+		status := http.StatusBadGateway
+		if errors.Is(err, context.DeadlineExceeded) {
+			status = http.StatusGatewayTimeout
+		}
+		w.WriteHeader(status)
+		json.NewEncoder(w).Encode(errorResponse{
+			Error:   "failed to fetch ownership",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(data)
 }
 
+// GetTraitRarity handles POST /traits
 func (h *RaribleHandler) GetTraitRarity(w http.ResponseWriter, r *http.Request) {
-	// парсим body JSON
+	w.Header().Set("Content-Type", "application/json")
+
 	var req rarible.TraitRarityRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse{
+			Error:   "invalid JSON",
+			Details: err.Error(),
+		})
 		return
 	}
 
-	data, err := h.client.QueryTraitsWithRarity(context.Background(), req)
+	if req.CollectionId == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse{
+			Error:   "collectionId required",
+			Details: "collectionId must not be empty",
+		})
+		return
+	}
+
+	if len(req.Properties) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse{
+			Error:   "properties required",
+			Details: "properties array must not be empty",
+		})
+		return
+	}
+
+	// можна обмежити максимальний ліміт
+	if req.Limit <= 0 || req.Limit > 50 {
+		req.Limit = 50
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), h.timeout)
+	defer cancel()
+
+	data, err := h.client.QueryTraitsWithRarity(ctx, req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		status := http.StatusBadGateway
+		if errors.Is(err, context.DeadlineExceeded) {
+			status = http.StatusGatewayTimeout
+		}
+		w.WriteHeader(status)
+		json.NewEncoder(w).Encode(errorResponse{
+			Error:   "failed to fetch trait rarity",
+			Details: err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(data)
 }
