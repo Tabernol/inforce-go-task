@@ -105,7 +105,6 @@ func (h *RaribleHandler) GetTraitRarity(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// можна обмежити максимальний ліміт
 	if req.Limit <= 0 || req.Limit > 50 {
 		req.Limit = 50
 	}

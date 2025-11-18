@@ -13,7 +13,6 @@ import (
 )
 
 func TestGetOwnershipByID(t *testing.T) {
-	// Мок сервер
 	handler := http.NewServeMux()
 	handler.HandleFunc("/v0.1/ownerships/test-id", func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "GET", r.Method)
