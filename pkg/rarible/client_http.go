@@ -7,16 +7,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
-type httpClient struct {
+type HttpClient struct {
 	baseURL string
 	apiKey  string
 	client  *http.Client
 }
 
 func NewClient(cfg Config) Client {
-	return &httpClient{
+	return &HttpClient{
 		baseURL: cfg.BaseURL,
 		apiKey:  cfg.ApiKey,
 		client: &http.Client{
@@ -25,7 +26,7 @@ func NewClient(cfg Config) Client {
 	}
 }
 
-func (c *httpClient) doRequest(ctx context.Context, method, path string, body any, out any) error {
+func (c *HttpClient) doRequest(ctx context.Context, method, path string, body any, out any) error {
 	var reqBody io.Reader
 
 	if body != nil {
@@ -36,12 +37,11 @@ func (c *httpClient) doRequest(ctx context.Context, method, path string, body an
 		reqBody = bytes.NewBuffer(b)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reqBody)
-	if err != nil {
-		return err
-	}
+	base := strings.TrimRight(c.baseURL, "/")
+	req, err := http.NewRequestWithContext(ctx, method, base+path, reqBody)
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 	if c.apiKey != "" {
 		req.Header.Set("X-API-KEY", c.apiKey)
 	}
@@ -64,7 +64,7 @@ func (c *httpClient) doRequest(ctx context.Context, method, path string, body an
 	return nil
 }
 
-func (c *httpClient) GetOwnershipByID(ctx context.Context, ownershipID string) (*Ownership, error) {
+func (c *HttpClient) GetOwnershipByID(ctx context.Context, ownershipID string) (*Ownership, error) {
 	var out Ownership
 	path := fmt.Sprintf("/v0.1/ownerships/%s", ownershipID)
 
@@ -75,9 +75,9 @@ func (c *httpClient) GetOwnershipByID(ctx context.Context, ownershipID string) (
 	return &out, nil
 }
 
-func (c *httpClient) QueryTraitsWithRarity(ctx context.Context, req TraitRarityRequest) (*TraitRarityResponse, error) {
+func (c *HttpClient) QueryTraitsWithRarity(ctx context.Context, req TraitRarityRequest) (*TraitRarityResponse, error) {
 	var out TraitRarityResponse
-	path := "/v0.1/items/traits/rarity" // <- новий endpoint
+	path := "/v0.1/items/traits/rarity"
 
 	if err := c.doRequest(ctx, http.MethodPost, path, req, &out); err != nil {
 		return nil, err
@@ -85,26 +85,3 @@ func (c *httpClient) QueryTraitsWithRarity(ctx context.Context, req TraitRarityR
 
 	return &out, nil
 }
-
-//func (c *httpClient) QueryTraitsWithRarity(ctx context.Context, req TraitRarityRequest) (*TraitRarityResponse, error) {
-//	var out TraitRarityResponse
-//	path := "/v0.1/items/byTraitRarities"
-//
-//	// Викликаємо doRequest для POST + JSON
-//	if err := c.doRequest(ctx, http.MethodPost, path, req, &out); err != nil {
-//		return nil, err
-//	}
-//
-//	return &out, nil
-//}
-
-//func (c *httpClient) QueryTraitsWithRarity(ctx context.Context, req TraitRarityRequest) (*TraitRarityResponse, error) {
-//	var out TraitRarityResponse
-//	path := "/v0.1/items/byTraitRarities"
-//
-//	if err := c.doRequest(ctx, http.MethodPost, path, req, &out); err != nil {
-//		return nil, err
-//	}
-//
-//	return &out, nil
-//}

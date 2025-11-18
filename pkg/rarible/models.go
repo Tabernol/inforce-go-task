@@ -18,18 +18,17 @@ type TraitRarityRequest struct {
 
 // Trait rarity response
 type TraitRarityResponse struct {
-	Items      []TraitRarity `json:"items"`
-	NextCursor string        `json:"nextCursor"`
+	Traits []TraitRarity `json:"traits"`
 }
 
 // Individual trait rarity entry
 type TraitRarity struct {
-	TraitType string  `json:"traitType"`
-	Value     string  `json:"value"`
-	Rarity    float64 `json:"rarity"`
+	Key    string `json:"key"`
+	Value  string `json:"value"`
+	Rarity string `json:"rarity"`
 }
 
 type TraitProperty struct {
-	Name   string   `json:"name,omitempty"`
-	Values []string `json:"values,omitempty"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }

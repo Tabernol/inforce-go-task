@@ -4,23 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/Tabernol/inforce-go-task/pkg/rarible"
-	"github.com/joho/godotenv"
 	"log"
-	"os"
-	"time"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println(".env file not found, using environment variables")
-	}
-
-	cfg := rarible.Config{
-		BaseURL:     "https://api.rarible.org",
-		HttpTimeout: 10 * time.Second,
-		ApiKey:      os.Getenv("RARIBLE_API_KEY"),
-	}
-
+	cfg := rarible.NewConfigFromEnv()
 	client := rarible.NewClient(cfg)
 
 	// ---- Test 1: Ownership ----
@@ -35,9 +23,11 @@ func main() {
 
 	// ---- Test 2: Trait rarity ----
 	req := rarible.TraitRarityRequest{
-		CollectionId: "ETHEREUM:0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",
-		Properties:   []rarible.TraitProperty{}, // або [{Name:"", Values:[]string{}}]
-		Limit:        2,
+		CollectionId: "ETHEREUM:0x60e4d786628fea6478f785a6d7e704777c86a7c6",
+		Properties: []rarible.TraitProperty{
+			{Key: "Hat", Value: "Halo"},
+		},
+		Limit: 12,
 	}
 
 	rarityResp, err := client.QueryTraitsWithRarity(context.Background(), req)
