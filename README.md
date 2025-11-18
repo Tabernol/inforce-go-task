@@ -133,7 +133,6 @@ go test ./... -v
 ├── internal/config        # Configuration loader
 ├── internal/server        # HTTP handlers and routing
 ├── pkg/rarible            # Rarible client and models
-├── helm/                  # Helm chart for K8s deployment
 ├── Dockerfile
 └── docker-compose.yml
 ```
