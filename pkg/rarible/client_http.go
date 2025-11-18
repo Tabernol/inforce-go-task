@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Tabernol/inforce-go-task/internal/config"
 	"io"
 	"net/http"
 	"strings"
@@ -16,12 +17,12 @@ type HttpClient struct {
 	client  *http.Client
 }
 
-func NewClient(cfg Config) Client {
+func NewClient(cfg config.Config) Client {
 	return &HttpClient{
-		baseURL: cfg.BaseURL,
-		apiKey:  cfg.ApiKey,
+		baseURL: cfg.RaribleBaseURL,
+		apiKey:  cfg.RaribleAPIKey,
 		client: &http.Client{
-			Timeout: cfg.HttpTimeout,
+			Timeout: cfg.RaribleTimeout,
 		},
 	}
 }
